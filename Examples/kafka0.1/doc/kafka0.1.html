@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>kafka0.1 · Drone Telemetry Broker — Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07090e; --panel:#0e131c; --panel-2:#131a25; --panel-3:#181f2c;
+    --line:#1e2735; --line-2:#2a3548;
+    --ink:#cdd4df; --muted:#737e8f; --dim:#4a5363;
+    --amber:#ffb340; --amber-d:#9a6f2e; --cyan:#54d8e4; --red:#ff6b6b; --green:#7ee08a; --purple:#b794f6;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --disp:'Space Grotesk',sans-serif;
+    --body:'IBM Plex Sans',sans-serif;
+    --sbw:264px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(900px 520px at 82% -6%,rgba(255,179,64,.06),transparent 60%),radial-gradient(800px 600px at 0% 102%,rgba(84,216,228,.045),transparent 55%)}
+  a{color:inherit}
+
+  /* ---------- sidebar ---------- */
+  .sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--sbw);z-index:20;
+    background:linear-gradient(180deg,#0b0f17,#090c12);border-right:1px solid var(--line);
+    padding:26px 20px 30px;overflow-y:auto}
+  .brand{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+  .brand .logo{font-family:var(--disp);font-weight:700;font-size:1.32rem;color:#fff;letter-spacing:-.01em}
+  .brand .logo b{color:var(--amber)}
+  .brand .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--muted);text-transform:uppercase}
+  .verbadge{display:inline-flex;align-items:center;gap:7px;margin:14px 0 22px;font-family:var(--mono);font-size:11px;
+    color:var(--amber);border:1px solid var(--amber-d);background:rgba(255,179,64,.07);border-radius:20px;padding:4px 11px;letter-spacing:.06em}
+  .verbadge .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 7px var(--amber)}
+  nav.toc{display:flex;flex-direction:column;gap:1px}
+  nav.toc .grp{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin:18px 0 7px;padding-left:11px}
+  nav.toc a{font-size:13.5px;color:var(--muted);text-decoration:none;padding:6px 11px;border-radius:6px;border-left:2px solid transparent;transition:.15s}
+  nav.toc a:hover{color:var(--ink);background:rgba(255,255,255,.025)}
+  nav.toc a.active{color:var(--amber);border-left-color:var(--amber);background:rgba(255,179,64,.06)}
+
+  /* ---------- main ---------- */
+  main{margin-left:var(--sbw);max-width:100%;padding:0 clamp(20px,5vw,64px) 120px;position:relative;z-index:1}
+  .hero{padding:64px 0 30px;border-bottom:1px solid var(--line);margin-bottom:14px}
+  .hero .kick{font-family:var(--mono);font-size:11.5px;letter-spacing:.28em;color:var(--cyan);text-transform:uppercase;margin-bottom:16px}
+  .hero h1{font-family:var(--disp);font-weight:700;font-size:clamp(2rem,4.6vw,3rem);color:#fff;line-height:1.02;letter-spacing:-.02em}
+  .hero h1 .a{color:var(--amber)}
+  .hero p{margin-top:16px;font-size:1.08rem;color:var(--ink);opacity:.9;max-width:60ch}
+
+  /* spec grid */
+  .spec{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:34px 0 8px}
+  .spec .cell{background:var(--panel);padding:15px 16px}
+  .spec .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+  .spec .v{font-family:var(--disp);font-weight:500;font-size:1rem;color:#fff}
+  .spec .v small{display:block;font-family:var(--mono);font-weight:400;font-size:11px;color:var(--cyan);margin-top:2px}
+  @media(max-width:720px){.spec{grid-template-columns:repeat(2,1fr)}}
+
+  section{padding:46px 0 8px;scroll-margin-top:30px}
+  section h2{font-family:var(--disp);font-weight:600;font-size:1.7rem;color:#fff;letter-spacing:-.015em;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+  section h2 .hash{font-family:var(--mono);font-size:1rem;color:var(--amber-d)}
+  section h3{font-family:var(--disp);font-weight:600;font-size:1.15rem;color:#fff;margin:30px 0 10px}
+  section > p{margin:12px 0;color:var(--ink);opacity:.9}
+  p.lead{color:var(--muted)}
+  strong{color:#fff;font-weight:600}
+  code.inl{font-family:var(--mono);font-size:.85em;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--amber)}
+  .sectit{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--cyan);text-transform:uppercase;margin-bottom:14px}
+
+  ul.clean{list-style:none;margin:10px 0 16px}
+  ul.clean li{position:relative;padding-left:22px;margin-bottom:9px;opacity:.92}
+  ul.clean li::before{content:"›";position:absolute;left:3px;color:var(--amber);font-family:var(--mono);font-weight:700}
+
+  /* code */
+  .code{background:#080b11;border:1px solid var(--line);border-radius:10px;margin:18px 0;overflow:hidden}
+  .code-head{display:flex;justify-content:space-between;align-items:center;padding:9px 13px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .code-head .fn{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .code-head .fn b{color:var(--amber);font-weight:400;margin-right:8px}
+  .copy{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--muted);background:var(--panel-2);border:1px solid var(--line-2);border-radius:5px;padding:4px 10px;cursor:pointer;text-transform:uppercase;transition:.15s}
+  .copy:hover{color:var(--amber);border-color:var(--amber-d)}
+  .copy.done{color:var(--green);border-color:rgba(126,224,138,.4)}
+  pre{margin:0;padding:15px 17px;overflow-x:auto;font-family:var(--mono);font-size:12.6px;line-height:1.7;tab-size:2}
+  pre code{color:#aeb6c2;white-space:pre}
+  .c-kw{color:#ff9ec7}.c-fn{color:var(--cyan)}.c-str{color:var(--green)}.c-num{color:var(--amber)}.c-com{color:#566072;font-style:italic}.c-cls{color:#ffd089}.c-pun{color:#7b8699}
+
+  /* component cards */
+  .comp{display:grid;gap:12px;margin:20px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:16px 18px;border-left:3px solid var(--line-2)}
+  .card.w{border-left-color:var(--cyan)} .card.b{border-left-color:var(--amber)} .card.s{border-left-color:var(--green)} .card.x{border-left-color:var(--red)}
+  .card .top{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:7px}
+  .card .num{font-family:var(--mono);font-size:11px;font-weight:700;color:#0a0d13;background:var(--amber);border-radius:5px;padding:2px 8px}
+  .card.w .num{background:var(--cyan)} .card.s .num{background:var(--green)} .card.x .num{background:var(--red)}
+  .card .fn{font-family:var(--mono);font-size:13.5px;color:#fff;font-weight:500}
+  .card .role{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-left:auto}
+  .card p{margin:0;font-size:14px;color:var(--ink);opacity:.88}
+  .card .meta{margin-top:9px;display:flex;flex-wrap:wrap;gap:7px}
+  .pill{font-family:var(--mono);font-size:10.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:2px 8px}
+  .pill.on{color:var(--green);border-color:rgba(126,224,138,.3)} .pill.no{color:var(--red);border-color:rgba(255,107,107,.3)}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
+  th,td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--amber);text-transform:uppercase;font-weight:500}
+  td:first-child{font-family:var(--mono);color:var(--cyan);font-size:13px;white-space:nowrap}
+  td code{font-family:var(--mono);font-size:12.5px;color:var(--amber)}
+
+  /* note */
+  .note{border-left:2px solid var(--cyan);background:linear-gradient(90deg,rgba(84,216,228,.06),transparent);padding:13px 17px;margin:20px 0;border-radius:0 8px 8px 0}
+  .note .h{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;color:var(--cyan);text-transform:uppercase;margin-bottom:5px}
+  .note.am{border-left-color:var(--amber)} .note.am .h{color:var(--amber)}
+  .note.rd{border-left-color:var(--red)} .note.rd .h{color:var(--red)}
+  .note p{margin:0;font-size:14px}
+
+  /* steps */
+  ol.steps{counter-reset:s;list-style:none;margin:16px 0}
+  ol.steps li{position:relative;padding:3px 0 16px 40px;margin:0}
+  ol.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:0;width:26px;height:26px;border-radius:50%;
+    background:var(--panel-2);border:1px solid var(--amber-d);color:var(--amber);font-family:var(--mono);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  ol.steps li:not(:last-child)::after{content:"";position:absolute;left:12.5px;top:30px;bottom:4px;width:1px;background:var(--line)}
+
+  /* arch svg wrap */
+  .figure{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px 18px;margin:22px 0}
+  .figcap{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;margin-top:10px}
+
+  footer{margin-top:60px;padding-top:26px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.9}
+  footer b{color:var(--amber)}
+
+  .mtoggle{display:none}
+  @media(max-width:880px){
+    :root{--sbw:0px}
+    .sidebar{transform:translateX(-100%);transition:transform .25s;width:264px}
+    .sidebar.open{transform:none}
+    main{margin-left:0;max-width:100%}
+    .mtoggle{display:flex;position:fixed;top:14px;left:14px;z-index:30;width:42px;height:42px;border-radius:9px;
+      background:var(--panel-2);border:1px solid var(--line-2);color:var(--amber);align-items:center;justify-content:center;font-size:20px;cursor:pointer}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<button class="mtoggle" id="mtoggle" aria-label="Toggle navigation">☰</button>
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="logo"><b>//</b> kafka<b>0.1</b></div>
+    <div class="tag">drone telemetry broker</div>
+  </div>
+  <div class="verbadge"><span class="dot"></span> v0.1 · reference build</div>
+  <nav class="toc" id="toc">
+    <a href="#overview">Overview</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#guarantees">Design &amp; guarantees</a>
+    <div class="grp">Components</div>
+    <a href="#components">The six processes</a>
+    <a href="#protocol">Protocol &amp; formats</a>
+    <a href="#config">Configuration</a>
+    <div class="grp">Operating</div>
+    <a href="#quickstart">Quick start</a>
+    <a href="#crashtest">The crash test</a>
+    <a href="#verify">Verifying no loss</a>
+    <div class="grp">Reference</div>
+    <a href="#limits">Limitations</a>
+    <a href="#roadmap">Roadmap → 0.2</a>
+  </nav>
+</aside>
+
+<main>
+  <div class="hero">
+    <div class="kick">Project documentation</div>
+    <h1>kafka<span class="a">0.1</span> — a drone telemetry broker</h1>
+    <p>A minimal, runnable message broker built on a single append-only log. It decouples a fast telemetry producer from a slow database consumer, delivers events live, and survives a database crash without losing data — the core ideas of Kafka, implemented from scratch in Node.js.</p>
+
+    <div class="spec">
+      <div class="cell"><div class="k">Version</div><div class="v">0.1<small>reference build</small></div></div>
+      <div class="cell"><div class="k">Runtime</div><div class="v">Node.js<small>18+</small></div></div>
+      <div class="cell"><div class="k">Transport</div><div class="v">HTTP · WS<small>:4001 · :4002</small></div></div>
+      <div class="cell"><div class="k">Store</div><div class="v">MongoDB<small>:27017</small></div></div>
+    </div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <div class="sectit">01 — Overview</div>
+    <h2><span class="hash">#</span> What this is</h2>
+    <p>kafka0.1 simulates a drone fleet sending telemetry faster than a database can absorb it. Instead of writing each event straight to MongoDB, every event is first appended to a durable log file. Independent readers then consume that log at their own pace: one streams events live to operators, another drains them into MongoDB.</p>
+    <p>The log in the middle is the entire point. It absorbs the rate mismatch between a fast producer and a slow consumer, and it acts as a buffer that holds events safely while downstream systems are slow, restarting, or crashed.</p>
+    <ul class="clean">
+      <li><strong>Decoupled</strong> — producers never wait on the database; a slow or dead consumer cannot block ingestion or live delivery.</li>
+      <li><strong>Replayable</strong> — each consumer tracks its own offset and resumes exactly where it stopped.</li>
+      <li><strong>Crash-safe</strong> — kill MongoDB mid-run and no data is lost; the log holds the backlog until the consumer catches up.</li>
+    </ul>
+    <div class="note am">
+      <div class="h">Scope</div>
+      <p>This is a teaching and prototyping build — faithful to Kafka's core mechanics (append-only log, offsets, decoupled consumers) but deliberately without partitions, replication, or segment indexing. Those are the <a href="#roadmap" style="color:var(--amber)">0.2 roadmap</a>.</p>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section id="architecture">
+    <div class="sectit">02 — Architecture</div>
+    <h2><span class="hash">#</span> How the pieces fit</h2>
+    <p>One writer feeds the log. Two readers consume it independently — a realtime path and a durable path — that never block each other.</p>
+
+    <div class="figure">
+      <svg width="100%" viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#54d8e4" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <!-- ingest -->
+        <g>
+          <rect x="120" y="40" width="200" height="58" rx="9" fill="#131a25" stroke="#2a3548"/>
+          <text x="220" y="66" fill="#fff" font-size="14" text-anchor="middle" font-weight="500">1 · Generator</text>
+          <text x="220" y="84" fill="#737e8f" font-size="11.5" text-anchor="middle">emits telemetry fast</text>
+        </g>
+        <g>
+          <rect x="400" y="40" width="200" height="58" rx="9" fill="#102019" stroke="#1d9e75"/>
+          <text x="500" y="66" fill="#fff" font-size="14" text-anchor="middle" font-weight="500">2 · Producer</text>
+          <text x="500" y="84" fill="#5dcaa5" font-size="11.5" text-anchor="middle">appends, assigns offset</text>
+        </g>
+        <line x1="320" y1="69" x2="392" y2="69" stroke="#54d8e4" stroke-width="1.4" marker-end="url(#ah)"/>
+        <!-- log -->
+        <g>
+          <rect x="120" y="160" width="480" height="64" rx="10" fill="#241c08" stroke="#854f0b"/>
+          <text x="360" y="186" fill="#ffb340" font-size="14.5" text-anchor="middle" font-weight="600">Append-only log · drone_events.log</text>
+          <text x="360" y="206" fill="#9a6f2e" font-size="11.5" text-anchor="middle">the buffer — every event in order, addressed by offset</text>
+        </g>
+        <line x1="500" y1="98" x2="500" y2="156" stroke="#54d8e4" stroke-width="1.4" marker-end="url(#ah)"/>
+        <!-- readers -->
+        <g>
+          <rect x="80" y="288" width="220" height="58" rx="9" fill="#102019" stroke="#1d9e75"/>
+          <text x="190" y="314" fill="#fff" font-size="14" text-anchor="middle" font-weight="500">3 · Broker</text>
+          <text x="190" y="332" fill="#5dcaa5" font-size="11.5" text-anchor="middle">tails log, pushes live</text>
+        </g>
+        <g>
+          <rect x="80" y="382" width="220" height="58" rx="9" fill="#131a25" stroke="#2a3548"/>
+          <text x="190" y="408" fill="#fff" font-size="14" text-anchor="middle" font-weight="500">5 · Client</text>
+          <text x="190" y="426" fill="#737e8f" font-size="11.5" text-anchor="middle">shows live telemetry</text>
+        </g>
+        <g>
+          <rect x="420" y="288" width="220" height="58" rx="9" fill="#102019" stroke="#1d9e75"/>
+          <text x="530" y="314" fill="#fff" font-size="14" text-anchor="middle" font-weight="500">4 · Consumer</text>
+          <text x="530" y="332" fill="#5dcaa5" font-size="11.5" text-anchor="middle">drains slowly to db</text>
+        </g>
+        <g>
+          <rect x="420" y="382" width="220" height="58" rx="9" fill="#131a25" stroke="#2a3548"/>
+          <text x="530" y="408" fill="#fff" font-size="14" text-anchor="middle" font-weight="500">MongoDB</text>
+          <text x="530" y="426" fill="#737e8f" font-size="11.5" text-anchor="middle">telemetry store</text>
+        </g>
+        <line x1="190" y1="224" x2="190" y2="284" stroke="#54d8e4" stroke-width="1.4" marker-end="url(#ah)"/>
+        <line x1="530" y1="224" x2="530" y2="284" stroke="#54d8e4" stroke-width="1.4" marker-end="url(#ah)"/>
+        <line x1="190" y1="346" x2="190" y2="378" stroke="#54d8e4" stroke-width="1.4" marker-end="url(#ah)"/>
+        <line x1="530" y1="346" x2="530" y2="378" stroke="#54d8e4" stroke-width="1.4" marker-end="url(#ah)"/>
+        <text x="205" y="262" fill="#737e8f" font-size="11" text-anchor="middle">realtime</text>
+        <text x="548" y="262" fill="#737e8f" font-size="11" text-anchor="middle">durable drain</text>
+      </svg>
+      <div class="figcap">Single writer (producer) · one log · two independent readers (broker, consumer)</div>
+    </div>
+
+    <p>Critically, the <strong>realtime path has no database in it</strong>. The broker reads the log and pushes to clients, so live telemetry keeps flowing even while MongoDB is down. The durable path is the only one that touches Mongo, and it is allowed to lag.</p>
+  </section>
+
+  <!-- GUARANTEES -->
+  <section id="guarantees">
+    <div class="sectit">03 — Design &amp; guarantees</div>
+    <h2><span class="hash">#</span> What it promises, and how</h2>
+    <table>
+      <tr><th>Property</th><th>Guarantee</th><th>Mechanism</th></tr>
+      <tr><td>Ordering</td><td>Per-log total order</td><td>Single writer + monotonic integer offset = line number</td></tr>
+      <tr><td>Delivery (DB)</td><td>Effectively once</td><td>Idempotent upsert keyed by <code>_id = offset</code></td></tr>
+      <tr><td>Crash recovery</td><td>Zero loss on DB outage</td><td>Consumer never advances its offset on a failed write</td></tr>
+      <tr><td>Decoupling</td><td>Producer never blocks</td><td>Producer writes only to the log; never touches Mongo</td></tr>
+      <tr><td>Live delivery</td><td>DB-independent</td><td>Broker fans out from the log over WebSocket</td></tr>
+    </table>
+    <div class="note">
+      <div class="h">The three load-bearing decisions</div>
+      <p>A <strong>single writer</strong> removes write races and makes ordering free. <strong>Offsets</strong> turn "where was I?" into integer comparison, enabling replay. <strong>Idempotent writes</strong> make "resume from where I stalled" safe even if a write half-succeeded before the crash.</p>
+    </div>
+  </section>
+
+  <!-- COMPONENTS -->
+  <section id="components">
+    <div class="sectit">04 — Components</div>
+    <h2><span class="hash">#</span> The six processes</h2>
+    <p class="lead">Five processes form the broker system; the sixth is the no-buffer baseline it is measured against.</p>
+
+    <div class="comp">
+      <div class="card">
+        <div class="top"><span class="num">1</span><span class="fn">with-kafka/1-generator.js</span><span class="role">generation</span></div>
+        <p>Simulates the drone fleet. Emits telemetry on a fast interval and POSTs each event to the producer. Touches no database and blocks on nothing downstream.</p>
+        <div class="meta"><span class="pill">HTTP client</span><span class="pill on">never blocks</span><span class="pill">GEN_INTERVAL_MS</span></div>
+      </div>
+
+      <div class="card b">
+        <div class="top"><span class="num">2</span><span class="fn">with-kafka/2-producer.js</span><span class="role">write path</span></div>
+        <p>HTTP ingest on <code class="inl">:4001/publish</code>. The sole writer of the log — appends <code class="inl">offset&#9;json</code> per event and recovers the next offset from the last line on startup. Never connects to MongoDB.</p>
+        <div class="meta"><span class="pill">single writer</span><span class="pill on">append-only</span><span class="pill no">no db</span></div>
+      </div>
+
+      <div class="card w">
+        <div class="top"><span class="num">3</span><span class="fn">with-kafka/3-broker.js</span><span class="role">main server</span></div>
+        <p>Tails the log for newly appended lines and broadcasts each to all subscribed WebSocket clients on <code class="inl">:4002</code>. Starts at the current end of the log, so clients receive events from the moment they connect.</p>
+        <div class="meta"><span class="pill">WebSocket</span><span class="pill on">live fan-out</span><span class="pill no">no db</span></div>
+      </div>
+
+      <div class="card s">
+        <div class="top"><span class="num">4</span><span class="fn">with-kafka/4-consumer.js</span><span class="role">durable drain</span></div>
+        <p>Reads the log from its committed offset and writes each event into MongoDB <strong>slowly</strong>, committing its offset after every write. On a Mongo failure it backs off and retries without advancing the offset, so it resumes with zero loss when the database returns.</p>
+        <div class="meta"><span class="pill">idempotent</span><span class="pill on">crash-safe</span><span class="pill">CONSUMER_DELAY_MS</span></div>
+      </div>
+
+      <div class="card w">
+        <div class="top"><span class="num">5</span><span class="fn">with-kafka/5-client.js</span><span class="role">client</span></div>
+        <p>Subscribes to the broker and prints live telemetry as it arrives. Keeps working while MongoDB is dead, and auto-reconnects if the broker restarts.</p>
+        <div class="meta"><span class="pill">WebSocket</span><span class="pill on">auto-reconnect</span></div>
+      </div>
+
+      <div class="card x">
+        <div class="top"><span class="num">✕</span><span class="fn">no-kafka/naive.js</span><span class="role">baseline</span></div>
+        <p>The comparison. Generates the same telemetry but writes it straight to MongoDB with no buffer. When the database is down, events have nowhere to go and are lost — it counts <code class="inl">produced</code>, <code class="inl">stored</code>, and <code class="inl">LOST</code>.</p>
+        <div class="meta"><span class="pill no">no buffer</span><span class="pill no">loses data</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROTOCOL -->
+  <section id="protocol">
+    <div class="sectit">05 — Protocol &amp; formats</div>
+    <h2><span class="hash">#</span> Wire &amp; storage formats</h2>
+
+    <h3>Ingest — HTTP</h3>
+    <p>The generator publishes a telemetry event to the producer:</p>
+    <div class="code">
+      <div class="code-head"><span class="fn"><b>POST</b>:4001/publish</span><button class="copy">COPY</button></div>
+<pre><code><span class="c-com">// request body</span>
+{ <span class="c-str">"droneId"</span>: <span class="c-str">"drone_101"</span>, <span class="c-str">"type"</span>: <span class="c-str">"BATTERY_LOW"</span>,
+  <span class="c-str">"lat"</span>: <span class="c-num">28.6139</span>, <span class="c-str">"lon"</span>: <span class="c-num">77.2090</span>, <span class="c-str">"battery"</span>: <span class="c-num">14</span>, <span class="c-str">"ts"</span>: <span class="c-num">1718000000000</span> }
+
+<span class="c-com">// response</span>
+{ <span class="c-str">"offset"</span>: <span class="c-num">42</span> }</code></pre>
+    </div>
+
+    <h3>Log line — on disk</h3>
+    <p>Each event is one line: the offset, a tab, then the event JSON.</p>
+    <div class="code">
+      <div class="code-head"><span class="fn"><b>FILE</b>data/drone_events.log</span><button class="copy">COPY</button></div>
+<pre><code><span class="c-num">40</span>	{<span class="c-str">"droneId"</span>:<span class="c-str">"drone_103"</span>,<span class="c-str">"type"</span>:<span class="c-str">"GPS_LOCK"</span>,<span class="c-str">"battery"</span>:<span class="c-num">89</span>,...}
+<span class="c-num">41</span>	{<span class="c-str">"droneId"</span>:<span class="c-str">"drone_101"</span>,<span class="c-str">"type"</span>:<span class="c-str">"RTL_ENGAGED"</span>,<span class="c-str">"battery"</span>:<span class="c-num">22</span>,...}
+<span class="c-num">42</span>	{<span class="c-str">"droneId"</span>:<span class="c-str">"drone_101"</span>,<span class="c-str">"type"</span>:<span class="c-str">"BATTERY_LOW"</span>,<span class="c-str">"battery"</span>:<span class="c-num">14</span>,...}</code></pre>
+    </div>
+
+    <h3>Live delivery — WebSocket</h3>
+    <p>The broker pushes each new event to clients as a framed message:</p>
+    <div class="code">
+      <div class="code-head"><span class="fn"><b>WS</b>:4002 → client</span><button class="copy">COPY</button></div>
+<pre><code>{ <span class="c-str">"offset"</span>: <span class="c-num">42</span>, <span class="c-str">"event"</span>: { <span class="c-str">"droneId"</span>: <span class="c-str">"drone_101"</span>, <span class="c-str">"type"</span>: <span class="c-str">"BATTERY_LOW"</span>, ... } }</code></pre>
+    </div>
+
+    <h3>MongoDB collections</h3>
+    <table>
+      <tr><th>Collection</th><th>Written by</th><th>Shape</th></tr>
+      <tr><td>telemetry</td><td>consumer</td><td><code>{ _id: offset, ...event }</code></td></tr>
+      <tr><td>consumer_offsets</td><td>consumer</td><td><code>{ _id: "drone-consumer", offset }</code></td></tr>
+      <tr><td>telemetry_naive</td><td>naive baseline</td><td><code>{ ...event }</code> (no offset)</td></tr>
+    </table>
+  </section>
+
+  <!-- CONFIG -->
+  <section id="config">
+    <div class="sectit">06 — Configuration</div>
+    <h2><span class="hash">#</span> config.js</h2>
+    <p>All scripts share one config. Every value can be overridden with an environment variable.</p>
+    <table>
+      <tr><th>Key</th><th>Default</th><th>Purpose</th></tr>
+      <tr><td>PRODUCER_PORT</td><td><code>4001</code></td><td>HTTP ingest port</td></tr>
+      <tr><td>BROKER_WS_PORT</td><td><code>4002</code></td><td>WebSocket fan-out port</td></tr>
+      <tr><td>LOG_FILE</td><td><code>data/drone_events.log</code></td><td>The append-only log</td></tr>
+      <tr><td>MONGO_URL</td><td><code>mongodb://localhost:27017</code></td><td>MongoDB connection</td></tr>
+      <tr><td>DB_NAME</td><td><code>drone_sim</code></td><td>Database name</td></tr>
+      <tr><td>GEN_INTERVAL_MS</td><td><code>50</code></td><td>Generator emit interval (fast)</td></tr>
+      <tr><td>CONSUMER_DELAY_MS</td><td><code>200</code></td><td>Consumer per-write delay (slow)</td></tr>
+    </table>
+    <div class="note am">
+      <div class="h">Widen the gap</div>
+      <p>A faster generator and slower consumer make the buffering more dramatic — the log backlog grows visibly. Try <code class="inl">GEN_INTERVAL_MS=20 CONSUMER_DELAY_MS=400</code>.</p>
+    </div>
+  </section>
+
+  <!-- QUICKSTART -->
+  <section id="quickstart">
+    <div class="sectit">07 — Operating</div>
+    <h2><span class="hash">#</span> Quick start</h2>
+    <p>Requires Node 18+ and a local MongoDB listening on <code class="inl">localhost:27017</code>.</p>
+    <div class="code">
+      <div class="code-head"><span class="fn"><b>SHELL</b>install</span><button class="copy">COPY</button></div>
+<pre><code>npm install</code></pre>
+    </div>
+    <p>Start the five processes in separate terminals. Order matters only for the producer and broker, which own the ports.</p>
+    <ol class="steps">
+      <li><code class="inl">node with-kafka/2-producer.js</code> — opens the ingest port and the log</li>
+      <li><code class="inl">node with-kafka/3-broker.js</code> — begins tailing the log for clients</li>
+      <li><code class="inl">node with-kafka/4-consumer.js</code> — starts draining to MongoDB</li>
+      <li><code class="inl">node with-kafka/5-client.js</code> — subscribes for live telemetry</li>
+      <li><code class="inl">node with-kafka/1-generator.js</code> — starts the telemetry stream</li>
+    </ol>
+    <p>You will see the producer appending quickly, the client printing live events, and the consumer writing to Mongo slowly — its reported <code class="inl">lag</code> grows because the generator outpaces it. That growing lag, sitting safely in the log, is the buffer doing its job.</p>
+  </section>
+
+  <!-- CRASH TEST -->
+  <section id="crashtest">
+    <div class="sectit">08 — Operating</div>
+    <h2><span class="hash">#</span> The crash test</h2>
+    <p>This is the experiment the whole design exists for. With everything running, <strong>stop the <code class="inl">mongod</code> process</strong> and watch the two halves of the system diverge.</p>
+
+    <h3>With the log (the broker system)</h3>
+    <ul class="clean">
+      <li>Producer, generator, broker and client are <strong>unaffected</strong> — telemetry keeps flowing.</li>
+      <li>The consumer logs <code class="inl">mongo write failed … NO DATA LOST</code> and backs off.</li>
+      <li>The log file <strong>keeps growing</strong> the entire time.</li>
+    </ul>
+    <p>Restart <code class="inl">mongod</code>. The consumer resumes from its committed offset and drains the whole backlog. Nothing was lost.</p>
+
+    <h3>Without the log (the naive baseline)</h3>
+    <div class="code">
+      <div class="code-head"><span class="fn"><b>SHELL</b>baseline</span><button class="copy">COPY</button></div>
+<pre><code>node no-kafka/naive.js
+<span class="c-com"># then stop mongod and watch:</span>
+<span class="c-com"># [naive] produced=120 stored=83 LOST=37   &lt;-- DATA LOSS</span></code></pre>
+    </div>
+    <p>Events produced during the outage have nowhere to wait and are gone permanently. Restarting Mongo only stores new events — the gap never fills.</p>
+
+    <div class="note rd">
+      <div class="h">The takeaway</div>
+      <p>Same crash, two outcomes. The only structural difference is the log sitting between the producer and the database. That buffer is the difference between a recoverable outage and permanent data loss.</p>
+    </div>
+  </section>
+
+  <!-- VERIFY -->
+  <section id="verify">
+    <div class="sectit">09 — Operating</div>
+    <h2><span class="hash">#</span> Verifying no loss</h2>
+    <p>Once the consumer has caught up, the document count in MongoDB equals the number of lines in the log:</p>
+    <div class="code">
+      <div class="code-head"><span class="fn"><b>SHELL</b>verify</span><button class="copy">COPY</button></div>
+<pre><code><span class="c-com"># count rows the broker system delivered to mongo</span>
+mongosh drone_sim --eval <span class="c-str">'db.telemetry.countDocuments()'</span>
+
+<span class="c-com"># count events that were ever written to the log</span>
+wc -l data/drone_events.log
+
+<span class="c-com"># the naive path will be short by exactly the events lost during the outage</span>
+mongosh drone_sim --eval <span class="c-str">'db.telemetry_naive.countDocuments()'</span></code></pre>
+    </div>
+  </section>
+
+  <!-- LIMITS -->
+  <section id="limits">
+    <div class="sectit">10 — Reference</div>
+    <h2><span class="hash">#</span> Limitations</h2>
+    <p class="lead">kafka0.1 is intentionally minimal. These are known and accepted for this version.</p>
+    <ul class="clean">
+      <li><strong>Single partition, single broker.</strong> No partitioning of the topic and no replication of the log — one machine, one file.</li>
+      <li><strong>Whole-file reads.</strong> The consumer re-reads the log each loop and the producer scans it on startup — clear over fast, fine for a demo, O(file size).</li>
+      <li><strong>One <code class="inl">writeSync</code> per message.</strong> A syscall per record caps throughput; there is no batching yet.</li>
+      <li><strong>No retention.</strong> The log grows forever — no segments, rotation, or compaction.</li>
+      <li><strong>In-memory subscriptions.</strong> Client subscriptions live in the broker's memory and reset on restart; clients receive only events from connection time onward (no historical replay yet).</li>
+      <li><strong>No durability beyond the OS.</strong> Writes reach the page cache, not guaranteed to disk — there is no <code class="inl">fsync</code> and no replication.</li>
+    </ul>
+  </section>
+
+  <!-- ROADMAP -->
+  <section id="roadmap">
+    <div class="sectit">11 — Reference</div>
+    <h2><span class="hash">#</span> Roadmap → 0.2</h2>
+    <p>The next version turns the demo into something closer to production, in the order each becomes worth the cost.</p>
+    <table>
+      <tr><th>Area</th><th>0.2 target</th><th>Unlocks</th></tr>
+      <tr><td>Segments</td><td>Rolled log files + sparse offset index</td><td>Cheap retention, O(log n) seeks</td></tr>
+      <tr><td>Throughput</td><td>Batched, fan-out-first writes</td><td>Far higher ingest rate, lower latency</td></tr>
+      <tr><td>Partitions</td><td>Hash routing by drone id</td><td>Parallel writes, per-drone ordering</td></tr>
+      <tr><td>Replay</td><td>Client connects with a starting offset</td><td>Offline catch-up for operators</td></tr>
+      <tr><td>Replication</td><td>Leader / follower + acks</td><td>Survive a dead disk, not just a dead db</td></tr>
+      <tr><td>Retention</td><td>Time/size eviction + compaction</td><td>Bounded storage, latest-state topics</td></tr>
+    </table>
+    <div class="note am">
+      <div class="h">Companion</div>
+      <p>The "Build Your Own Kafka" field manual walks through every one of these layers with working Node.js — this doc covers what 0.1 ships; the manual covers where it goes next.</p>
+    </div>
+  </section>
+
+  <footer>
+    <div><b>kafka0.1</b> · drone telemetry broker · reference documentation</div>
+    <div>append-only · single writer · offset-addressed · crash-safe drain</div>
+    <div style="margin-top:10px;color:var(--dim)">// the log is the source of truth — everything else is a view of it</div>
+  </footer>
+</main>
+
+<script>
+(function(){
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // copy buttons
+  document.querySelectorAll('.copy').forEach(function(b){
+    b.addEventListener('click',function(){
+      var t = b.closest('.code').querySelector('pre').innerText;
+      navigator.clipboard.writeText(t).then(function(){
+        b.textContent='COPIED'; b.classList.add('done');
+        setTimeout(function(){ b.textContent='COPY'; b.classList.remove('done'); },1300);
+      }).catch(function(){ b.textContent='—'; });
+    });
+  });
+
+  // mobile nav
+  var sb = document.getElementById('sidebar'), mt = document.getElementById('mtoggle');
+  mt && mt.addEventListener('click', function(){ sb.classList.toggle('open'); });
+  document.querySelectorAll('#toc a').forEach(function(a){
+    a.addEventListener('click', function(){ sb.classList.remove('open'); });
+  });
+
+  // scrollspy
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var map = {};
+  links.forEach(function(a){ var id=a.getAttribute('href').slice(1); var el=document.getElementById(id); if(el) map[id]=a; });
+  var sections = Object.keys(map).map(function(id){ return document.getElementById(id); });
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        links.forEach(function(l){ l.classList.remove('active'); });
+        var a = map[e.target.id]; if(a) a.classList.add('active');
+      }
+    });
+  }, {rootMargin:'-10% 0px -78% 0px', threshold:0});
+  sections.forEach(function(s){ io.observe(s); });
+})();
+</script>
+</body>
+</html>
