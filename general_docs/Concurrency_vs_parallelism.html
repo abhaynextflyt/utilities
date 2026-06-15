@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concurrency, Parallelism &amp; the Event Loop — Field Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07090e;--panel:#0e131c;--panel-2:#131a25;--panel-3:#181f2c;
+    --line:#1e2735;--line-2:#2a3548;
+    --ink:#cdd4df;--muted:#737e8f;--dim:#4a5363;
+    --amber:#ffb340;--amber-d:#9a6f2e;--cyan:#54d8e4;--cyan-d:#2f7b85;--red:#ff6b6b;--green:#7ee08a;--purple:#b794f6;
+    --mono:'JetBrains Mono',ui-monospace,monospace;--disp:'Space Grotesk',sans-serif;--body:'IBM Plex Sans',sans-serif;
+    --sbw:270px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.68;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(900px 520px at 84% -6%,rgba(255,179,64,.06),transparent 60%),radial-gradient(820px 600px at -2% 102%,rgba(84,216,228,.05),transparent 55%)}
+
+  /* sidebar */
+  .sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--sbw);z-index:20;background:linear-gradient(180deg,#0b0f17,#090c12);
+    border-right:1px solid var(--line);padding:26px 18px 40px;overflow-y:auto}
+  .brand .logo{font-family:var(--disp);font-weight:700;font-size:1.18rem;color:#fff;letter-spacing:-.01em;line-height:1.2}
+  .brand .logo b{color:var(--cyan)}
+  .brand .tag{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;margin-top:5px}
+  .verbadge{display:inline-flex;align-items:center;gap:7px;margin:14px 0 20px;font-family:var(--mono);font-size:10.5px;color:var(--cyan);
+    border:1px solid var(--cyan-d);background:rgba(84,216,228,.06);border-radius:20px;padding:4px 11px;letter-spacing:.05em}
+  .verbadge .dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 7px var(--cyan)}
+  nav.toc{display:flex;flex-direction:column;gap:1px}
+  nav.toc .grp{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin:16px 0 6px;padding-left:10px}
+  nav.toc a{font-size:13px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:6px;border-left:2px solid transparent;transition:.15s;line-height:1.35}
+  nav.toc a:hover{color:var(--ink);background:rgba(255,255,255,.025)}
+  nav.toc a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(84,216,228,.06)}
+
+  /* main */
+  main{margin-left:var(--sbw);max-width:100%;padding:0 clamp(20px,5vw,60px) 120px;position:relative;z-index:1}
+  .hero{padding:62px 0 30px;border-bottom:1px solid var(--line);margin-bottom:10px}
+  .hero .kick{font-family:var(--mono);font-size:11px;letter-spacing:.28em;color:var(--amber);text-transform:uppercase;margin-bottom:16px}
+  .hero h1{font-family:var(--disp);font-weight:700;font-size:clamp(2rem,4.5vw,2.9rem);color:#fff;line-height:1.04;letter-spacing:-.02em}
+  .hero h1 .a{color:var(--cyan)}
+  .hero p{margin-top:16px;font-size:1.07rem;color:var(--ink);opacity:.9;max-width:62ch}
+
+  section{padding:44px 0 6px;scroll-margin-top:24px}
+  .sectit{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;margin-bottom:13px}
+  h2{font-family:var(--disp);font-weight:600;font-size:1.6rem;color:#fff;letter-spacing:-.015em;margin-bottom:10px;display:flex;gap:11px;align-items:center}
+  h2 .hash{font-family:var(--mono);font-size:.95rem;color:var(--amber-d)}
+  h3{font-family:var(--disp);font-weight:600;font-size:1.12rem;color:#fff;margin:28px 0 9px}
+  p{margin:11px 0;opacity:.92}
+  p.lead{color:var(--muted)}
+  strong{color:#fff;font-weight:600}
+  em{color:var(--cyan);font-style:normal}
+  code.inl{font-family:var(--mono);font-size:.84em;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--amber)}
+  a.xl{color:var(--cyan);text-decoration:none;border-bottom:1px solid rgba(84,216,228,.3)}
+
+  ul.clean{list-style:none;margin:10px 0 16px}
+  ul.clean li{position:relative;padding-left:22px;margin-bottom:9px;opacity:.92}
+  ul.clean li::before{content:"›";position:absolute;left:3px;color:var(--amber);font-family:var(--mono);font-weight:700}
+
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:13.8px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--amber);text-transform:uppercase;font-weight:500}
+  td:first-child{color:var(--cyan)}
+  td code,th code{font-family:var(--mono)}
+
+  .note{border-left:2px solid var(--cyan);background:linear-gradient(90deg,rgba(84,216,228,.06),transparent);padding:13px 17px;margin:18px 0;border-radius:0 8px 8px 0}
+  .note .h{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--cyan);text-transform:uppercase;margin-bottom:5px}
+  .note.am{border-left-color:var(--amber)}.note.am .h{color:var(--amber)}
+  .note.rd{border-left-color:var(--red)}.note.rd .h{color:var(--red)}
+  .note p{margin:0;font-size:14px}
+
+  /* slogan card */
+  .slogan{background:var(--panel);border:1px solid var(--line-2);border-radius:12px;padding:18px 20px;margin:22px 0;position:relative}
+  .slogan::before{content:"MENTAL MODEL";position:absolute;top:-9px;left:16px;background:var(--bg);padding:0 8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;color:var(--amber)}
+  .slogan p{margin:0;font-family:var(--disp);font-size:1.08rem;color:#fff;line-height:1.45}
+  .slogan p em{color:var(--cyan)}
+
+  /* code */
+  .code{background:#080b11;border:1px solid var(--line);border-radius:10px;margin:16px 0;overflow:hidden}
+  .code-head{display:flex;justify-content:space-between;align-items:center;padding:8px 13px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .code-head .fn{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .code-head .fn b{color:var(--amber);font-weight:400;margin-right:7px}
+  .copy{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--muted);background:var(--panel-2);border:1px solid var(--line-2);border-radius:5px;padding:4px 9px;cursor:pointer;text-transform:uppercase;transition:.15s}
+  .copy:hover{color:var(--amber);border-color:var(--amber-d)}.copy.done{color:var(--green);border-color:rgba(126,224,138,.4)}
+  pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12.4px;line-height:1.7;tab-size:2}
+  pre code{color:#aeb6c2;white-space:pre}
+  .c-kw{color:#ff9ec7}.c-fn{color:var(--cyan)}.c-str{color:var(--green)}.c-num{color:var(--amber)}.c-com{color:#566072;font-style:italic}
+
+  /* timeline lanes */
+  .tl{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:18px;margin:20px 0}
+  .tl .lane{margin-bottom:16px}
+  .tl .lane:last-child{margin-bottom:0}
+  .tl .ll{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:7px;display:flex;justify-content:space-between}
+  .tl .ll b{color:var(--ink);font-weight:500}
+  .tl .ll .verdict{color:var(--red)}.tl .lane.par .ll .verdict{color:var(--green)}
+  .tl .track{position:relative;height:26px;background:#080b11;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .tl .op{position:absolute;top:3px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:10px;color:#0a0d13;font-weight:700}
+  .tl .op.a{background:rgba(255,179,64,.85)}.tl .op.b{background:rgba(84,216,228,.85)}.tl .op.c{background:rgba(126,224,138,.85)}
+  .tl .axis{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:right;margin-top:6px}
+
+  /* stack diagram */
+  .stack{margin:20px 0}
+  .layer{border:1px solid var(--line);border-radius:9px;padding:12px 16px;margin-bottom:9px;background:var(--panel);display:flex;gap:14px;align-items:baseline}
+  .layer .lab{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--amber);min-width:130px;text-transform:uppercase}
+  .layer .desc{font-size:14px;color:var(--ink);opacity:.9}
+  .layer.l1{border-left:3px solid var(--purple)}.layer.l1 .lab{color:var(--purple)}
+  .layer.l2{border-left:3px solid var(--cyan)}.layer.l2 .lab{color:var(--cyan)}
+  .layer.l3{border-left:3px solid var(--amber)}.layer.l3 .lab{color:var(--amber)}
+  .layer.l4{border-left:3px solid var(--green)}.layer.l4 .lab{color:var(--green)}
+  .stack .arrow{text-align:center;color:var(--dim);font-family:var(--mono);font-size:13px;margin:-3px 0 6px}
+
+  /* phase pills */
+  .phases{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+  .phase{border:1px solid var(--line-2);border-radius:7px;padding:9px 12px;background:var(--panel);flex:1;min-width:120px}
+  .phase .n{font-family:var(--mono);font-size:10px;color:var(--cyan);letter-spacing:.06em}
+  .phase .d{font-size:12.5px;color:var(--muted);margin-top:3px}
+
+  footer{margin-top:56px;padding-top:24px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.9}
+  footer b{color:var(--cyan)}
+
+  .mtoggle{display:none}
+  @media(max-width:880px){
+    :root{--sbw:0px}
+    .sidebar{transform:translateX(-100%);transition:transform .25s;width:270px}.sidebar.open{transform:none}
+    main{margin-left:0;max-width:100%}
+    .mtoggle{display:flex;position:fixed;top:14px;left:14px;z-index:30;width:42px;height:42px;border-radius:9px;background:var(--panel-2);border:1px solid var(--line-2);color:var(--cyan);align-items:center;justify-content:center;font-size:20px;cursor:pointer}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<button class="mtoggle" id="mtoggle" aria-label="Toggle navigation">☰</button>
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="logo"><b>//</b> Concurrency<br>&amp; the Event Loop</div>
+    <div class="tag">field manual</div>
+  </div>
+  <div class="verbadge"><span class="dot"></span> reference · v1</div>
+  <nav class="toc" id="toc">
+    <div class="grp">Foundations</div>
+    <a href="#distinction">Concurrency vs parallelism</a>
+    <a href="#bound">CPU-bound vs I/O-bound</a>
+    <div class="grp">How JS runs</div>
+    <a href="#loop">The single thread</a>
+    <a href="#phases">Event loop phases</a>
+    <a href="#tasks">Macro vs microtasks</a>
+    <a href="#dispatch">Serial vs parallel dispatch</a>
+    <a href="#blocking">Blocking the loop</a>
+    <div class="grp">Under the hood</div>
+    <a href="#libuv">libuv &amp; the OS</a>
+    <a href="#network">Network: epoll</a>
+    <a href="#disk">Disk: the thread pool</a>
+    <a href="#iouring">io_uring (the future)</a>
+    <div class="grp">The hardware ceiling</div>
+    <a href="#hardware">Hardware decides</a>
+    <a href="#seqrandom">Sequential vs random</a>
+    <a href="#durability">Durability &amp; fsync</a>
+    <a href="#little">Little's law</a>
+    <div class="grp">Scaling out</div>
+    <a href="#threadsproc">Threads vs processes</a>
+    <a href="#gil">The GIL &amp; languages</a>
+    <a href="#toolkit">Node's toolkit</a>
+    <a href="#shared">Shared memory</a>
+    <a href="#green">Green threads</a>
+    <a href="#scenarios">The three scenarios</a>
+    <div class="grp">Synthesis</div>
+    <a href="#partitions">Partitions &amp; Kafka</a>
+    <a href="#amdahl">Amdahl &amp; limits</a>
+    <a href="#decision">Decision framework</a>
+  </nav>
+</aside>
+
+<main>
+  <div class="hero">
+    <div class="kick">Systems concepts · for future reference</div>
+    <h1>Concurrency, parallelism &amp; <span class="a">the event loop</span></h1>
+    <p>Everything that sits between "JavaScript is single-threaded" and "this log broker writes 100 partitions at once." How async actually overlaps work, where the real parallelism comes from, and which lever to pull when — with the adjacent concepts you'll reach for next.</p>
+  </div>
+
+  <!-- ============ FOUNDATIONS ============ -->
+  <section id="distinction">
+    <div class="sectit">01 — Foundations</div>
+    <h2><span class="hash">#</span> Concurrency is not parallelism</h2>
+    <p>These two words get smushed together and cause most of the confusion. They are different things.</p>
+    <ul class="clean">
+      <li><strong>Concurrency</strong> — dealing with many things at once by interleaving them. Tasks are <em>in progress</em> together, but a single worker can switch between them. It's a structure for handling overlap.</li>
+      <li><strong>Parallelism</strong> — doing many things at the same instant, on separate workers (cores, disks, machines). Genuinely simultaneous execution.</li>
+    </ul>
+    <p>A single chef juggling four pans is <strong>concurrent</strong> — one person, rapid switching, nothing burns. Four chefs each on one pan is <strong>parallel</strong>. Node's event loop is the one chef: spectacular at concurrency, incapable of parallelism on its own.</p>
+    <div class="slogan"><p>Concurrency is about <em>structure</em> — handling many in-flight tasks. Parallelism is about <em>execution</em> — running them literally at once. You can have either without the other.</p></div>
+  </section>
+
+  <section id="bound">
+    <div class="sectit">02 — Foundations</div>
+    <h2><span class="hash">#</span> CPU-bound vs I/O-bound</h2>
+    <p>This is the single most important lens. Before asking "how do I make this faster," ask what the task is <em>waiting</em> on.</p>
+    <table>
+      <tr><th>Type</th><th>Bottleneck</th><th>Examples</th><th>What helps</th></tr>
+      <tr><td>I/O-bound</td><td>Waiting on disk, network, DB</td><td>Append to log, HTTP, DB query</td><td>Concurrency — many ops in flight on one thread</td></tr>
+      <tr><td>CPU-bound</td><td>Doing computation</td><td>Compression, hashing, parsing</td><td>Parallelism — more cores running code</td></tr>
+    </table>
+    <p>Appending to a log is <strong>I/O-bound</strong>: the thread spends its time waiting for the disk, not computing. That single fact is why a single-threaded Node process can keep a disk — or a hundred disks — fully fed. The work isn't on the CPU; it's on the hardware.</p>
+    <div class="slogan"><p>Async gives you <em>concurrency of waiting</em>. Threads and processes give you <em>parallelism of working</em>. Match the tool to which one you're short on.</p></div>
+  </section>
+
+  <!-- ============ HOW JS RUNS ============ -->
+  <section id="loop">
+    <div class="sectit">03 — How JavaScript runs</div>
+    <h2><span class="hash">#</span> One thread, one callback at a time</h2>
+    <p>Your JavaScript runs on exactly one thread. The <strong>event loop</strong> pulls one callback off a queue, runs it to completion, then pulls the next. Two JS callbacks never execute simultaneously in a single process — there is no preemption mid-function.</p>
+    <p>This is a feature, not just a limit: because nothing else runs while your function is on the stack, you never face data races on your own variables. The cost is that one long-running callback blocks <em>everything</em> behind it.</p>
+    <p>The crucial move is separating two mechanisms people conflate: the <strong>callback queue</strong> (serial, runs your JS one at a time) and <strong>async I/O</strong> (the actual disk/network work, done off your thread by libuv or the kernel). The queue is serial; the I/O underneath it is not.</p>
+  </section>
+
+  <section id="phases">
+    <div class="sectit">04 — How JavaScript runs</div>
+    <h2><span class="hash">#</span> The event loop has phases</h2>
+    <p>"The event loop" isn't one queue — it's a cycle through ordered phases, each draining its own queue before moving on. Knowing the order explains a lot of "why did this callback run before that one" surprises.</p>
+    <div class="phases">
+      <div class="phase"><div class="n">1 · timers</div><div class="d">setTimeout / setInterval callbacks due now</div></div>
+      <div class="phase"><div class="n">2 · pending</div><div class="d">deferred system callbacks (some errors)</div></div>
+      <div class="phase"><div class="n">3 · poll</div><div class="d">retrieve I/O events; run their callbacks. The loop parks here when idle</div></div>
+      <div class="phase"><div class="n">4 · check</div><div class="d">setImmediate callbacks</div></div>
+      <div class="phase"><div class="n">5 · close</div><div class="d">close handlers (socket 'close', etc.)</div></div>
+    </div>
+    <p>The <strong>poll</strong> phase is where the loop spends its waiting time — blocked on the OS, asking "any I/O ready?" When a disk write finishes or a socket has data, its callback runs here. If nothing is pending, the loop sleeps here rather than spinning, which is why an idle Node server uses ~0% CPU.</p>
+  </section>
+
+  <section id="tasks">
+    <div class="sectit">05 — How JavaScript runs</div>
+    <h2><span class="hash">#</span> Macrotasks vs microtasks</h2>
+    <p>Between every phase, Node drains two higher-priority queues completely before continuing. These are <strong>microtasks</strong>, and they jump ahead of ordinary callbacks.</p>
+    <ul class="clean">
+      <li><code class="inl">process.nextTick()</code> — drained first, before anything else, after the current operation.</li>
+      <li><strong>Promise</strong> callbacks (<code class="inl">.then</code>, resolved <code class="inl">await</code>) — drained next, before the loop advances to the next phase.</li>
+      <li><strong>Macrotasks</strong> — timers, I/O callbacks, <code class="inl">setImmediate</code>: one per loop turn, the phase-based queue above.</li>
+    </ul>
+    <div class="note rd">
+      <div class="h">Footgun</div>
+      <p>A recursive <code class="inl">process.nextTick</code> or an unbounded promise chain can <em>starve the loop</em> — microtasks keep jumping the queue, so the poll phase never runs and your I/O callbacks never fire. Concurrency dies even though nothing is "blocking" in the CPU sense.</p>
+    </div>
+  </section>
+
+  <section id="dispatch">
+    <div class="sectit">06 — How JavaScript runs</div>
+    <h2><span class="hash">#</span> Serial vs parallel dispatch — your choice</h2>
+    <p>Issuing an async operation does <strong>not</strong> wait for its result. The call returns in microseconds and the work runs off-thread. So whether operations overlap is decided entirely by <em>where you put your</em> <code class="inl">await</code> — it is a choice, not a law.</p>
+
+    <div class="tl">
+      <div class="lane">
+        <div class="ll"><b>await between each op</b> <span class="verdict">serial — no overlap</span></div>
+        <div class="track">
+          <div class="op a" style="left:2px;width:30%">op1</div>
+          <div class="op b" style="left:34%;width:30%">op2</div>
+          <div class="op c" style="left:66%;width:30%">op3</div>
+        </div>
+        <div class="axis">total ≈ t1 + t2 + t3</div>
+      </div>
+      <div class="lane par">
+        <div class="ll"><b>fire all, then await together</b> <span class="verdict">parallel — overlapping</span></div>
+        <div class="track">
+          <div class="op a" style="left:2px;width:62%">op1</div>
+          <div class="op b" style="left:2px;top:3px;width:48%;opacity:.6">op2</div>
+          <div class="op c" style="left:2px;width:74%;opacity:.35">op3</div>
+        </div>
+        <div class="axis">total ≈ max(t1, t2, t3)</div>
+      </div>
+    </div>
+
+    <div class="code">
+      <div class="code-head"><span class="fn"><b>SERIAL</b>each waits for the last</span><button class="copy">COPY</button></div>
+<pre><code><span class="c-kw">await</span> <span class="c-fn">op1</span>(); <span class="c-kw">await</span> <span class="c-fn">op2</span>(); <span class="c-kw">await</span> <span class="c-fn">op3</span>();  <span class="c-com">// op2 starts only after op1 resolves</span></code></pre>
+    </div>
+    <div class="code">
+      <div class="code-head"><span class="fn"><b>PARALLEL</b>dispatch first, collect after</span><button class="copy">COPY</button></div>
+<pre><code><span class="c-kw">const</span> a = <span class="c-fn">op1</span>(), b = <span class="c-fn">op2</span>(), c = <span class="c-fn">op3</span>();  <span class="c-com">// all in flight now</span>
+<span class="c-kw">await</span> <span class="c-fn">Promise</span>.<span class="c-fn">all</span>([a, b, c]);            <span class="c-com">// collect already-cooking results</span></code></pre>
+    </div>
+    <p>This maps straight onto partitioned writes: <strong>within</strong> a partition you await each write before the next (deliberately serial — that preserves order); <strong>across</strong> partitions you dispatch without awaiting between them (overlapping — that's the parallelism).</p>
+  </section>
+
+  <section id="blocking">
+    <div class="sectit">07 — How JavaScript runs</div>
+    <h2><span class="hash">#</span> Blocking the loop is the cardinal sin</h2>
+    <p>Because all your JS shares one thread, a CPU-heavy synchronous function freezes the entire server while it runs — no I/O callbacks, no new connections, nothing. A 200ms JSON parse on a hot path adds 200ms of latency to <em>every</em> concurrent request.</p>
+    <p>Mitigations, in order of reach: break the work into chunks yielded with <code class="inl">setImmediate</code>; move it to a <code class="inl">worker_thread</code>; or offload to a native/streaming library that does the heavy lifting off-thread. The rule of thumb: keep individual callbacks short, and never do unbounded CPU work on the main thread.</p>
+  </section>
+
+  <!-- ============ UNDER THE HOOD ============ -->
+  <section id="libuv">
+    <div class="sectit">08 — Under the hood</div>
+    <h2><span class="hash">#</span> libuv: the loop plus a thread pool</h2>
+    <p>Node delegates all async work to <strong>libuv</strong>, a C library with two distinct engines. Understanding which engine handles which I/O explains every concurrency limit you'll hit.</p>
+    <div class="stack">
+      <div class="layer l1"><div class="lab">Your JS</div><div class="desc">one thread, one callback at a time — dispatches and handles results</div></div>
+      <div class="arrow">↓ hands off async work</div>
+      <div class="layer l2"><div class="lab">libuv loop</div><div class="desc">network &amp; timers — watched by the OS event notifier, no extra threads</div></div>
+      <div class="layer l3"><div class="lab">libuv pool</div><div class="desc">disk (fs), DNS, crypto — a fixed pool of worker threads</div></div>
+      <div class="arrow">↓ issues syscalls</div>
+      <div class="layer l4"><div class="lab">OS + hardware</div><div class="desc">kernel, device queues, the actual disks &amp; NICs that do the work</div></div>
+    </div>
+    <p>The split is the key insight: <strong>network I/O</strong> uses an OS notification mechanism and scales almost without limit on the single thread, while <strong>disk I/O</strong> is routed through a small, fixed thread pool. Same <code class="inl">await</code> syntax, completely different scaling characteristics underneath.</p>
+  </section>
+
+  <section id="network">
+    <div class="sectit">09 — Under the hood</div>
+    <h2><span class="hash">#</span> Network I/O: epoll and the C10k problem</h2>
+    <p>Sockets don't use the thread pool. The OS provides an event-notification interface — <code class="inl">epoll</code> on Linux, <code class="inl">kqueue</code> on BSD/macOS, IOCP on Windows — that lets one thread watch <em>thousands</em> of connections and ask the kernel "which of these are ready?" in a single call.</p>
+    <p>This is what solved the historic <strong>C10k problem</strong> (handling ten thousand simultaneous connections). The old model used one thread per connection — 10,000 threads, crushing memory and context-switch overhead. The event-driven model uses one thread watching all 10,000 descriptors. It's the entire reason an event-loop server can hold enormous connection counts cheaply, and why network concurrency in Node is effectively unbounded.</p>
+  </section>
+
+  <section id="disk">
+    <div class="sectit">10 — Under the hood</div>
+    <h2><span class="hash">#</span> Disk I/O: the fixed thread pool</h2>
+    <p>File operations can't be watched the same way — historically there was no good "tell me when this file write is ready" primitive — so libuv runs them on a <strong>thread pool</strong>. Each <code class="inl">fs</code> call occupies a pool thread until it completes.</p>
+    <table>
+      <tr><th>Property</th><th>Value</th><th>Consequence</th></tr>
+      <tr><td>Default size</td><td><code>4</code></td><td>Only 4 file ops execute at once; the rest queue</td></tr>
+      <tr><td>Knob</td><td><code>UV_THREADPOOL_SIZE</code></td><td>Must be set <em>before</em> the pool is created (process start)</td></tr>
+      <tr><td>Cap</td><td>historically <code>128</code>, <code>1024</code> in modern libuv</td><td>You can raise it, but not arbitrarily</td></tr>
+      <tr><td>Also shares it</td><td>DNS lookup, crypto, zlib</td><td>A flood of <code>fs</code> can starve <code>dns</code>, and vice versa</td></tr>
+    </table>
+    <p>So "fire 100 file writes" really means "100 submitted, ~4 running, the rest waiting for a free pool thread" — unless you raise the pool size. That's the software ceiling. But raising it only matters if the hardware underneath can actually do more at once, which is the next section.</p>
+  </section>
+
+  <section id="iouring">
+    <div class="sectit">11 — Under the hood</div>
+    <h2><span class="hash">#</span> io_uring — where this is heading</h2>
+    <p>The thread-pool-for-disk design is a workaround for an old gap. Modern Linux closes it with <strong>io_uring</strong>: a true asynchronous interface for disk I/O, where the kernel completes file operations without tying up a worker thread, using shared submission/completion ring buffers.</p>
+    <p>Recent libuv versions use io_uring for some filesystem operations on Linux, which can lift disk I/O closer to the unbounded model network already enjoys — fewer thread-pool bottlenecks, higher concurrent-write ceilings. Worth knowing as a direction: the thread-pool limit you tune today is partly a historical artifact, not a law of nature.</p>
+  </section>
+
+  <!-- ============ HARDWARE ============ -->
+  <section id="hardware">
+    <div class="sectit">12 — The hardware ceiling</div>
+    <h2><span class="hash">#</span> Hardware decides the real parallelism</h2>
+    <p>Threads and pools are <em>permission slips</em> to use parallelism the hardware either has or doesn't. The thread pool lets you <strong>submit</strong> 100 concurrent writes; whether they <strong>execute</strong> at once is decided by how many independent devices exist underneath.</p>
+    <table>
+      <tr><th>Setup</th><th>Result</th></tr>
+      <tr><td>100 separate physical disks</td><td>Real parallelism — 100 writes land at once, devices independent</td></tr>
+      <tr><td>100 files on one HDD</td><td>No gain — all funnel into one device queue and serialize; contention may make it worse</td></tr>
+      <tr><td>One fast NVMe SSD</td><td>Partial — deep hardware queues overlap a dozen-ish; tune pool to queue depth, not partition count</td></tr>
+    </table>
+    <div class="slogan"><p>Threads are not the parallelism. <em>Independent hardware</em> is. A thread pool is necessary but not sufficient — it can only feed parallelism the disks already provide.</p></div>
+    <p>Beyond the disks themselves, the path matters: enough PCIe lanes, controller bandwidth, and on big boxes NUMA locality (which CPU socket owns which device). "100 disks" only parallelizes if the bus feeding them isn't itself the bottleneck.</p>
+  </section>
+
+  <section id="seqrandom">
+    <div class="sectit">13 — The hardware ceiling</div>
+    <h2><span class="hash">#</span> Why append-only is fast: sequential I/O</h2>
+    <p>There's a reason a log is append-only rather than a mutable structure. <strong>Sequential</strong> writes — always to the end of the file — are dramatically faster than <strong>random</strong> writes scattered across the device.</p>
+    <ul class="clean">
+      <li>On a spinning disk, sequential avoids seek time — the head doesn't move. Random writes pay a seek per operation, often 100× slower.</li>
+      <li>On an SSD, sequential reduces write amplification and plays well with the flash translation layer; random writes churn the controller.</li>
+      <li>The OS can coalesce sequential writes into large, efficient flushes; it can't coalesce scattered ones.</li>
+    </ul>
+    <p>This is the deep reason Kafka and your broker are built on a log at all: appending is the one disk access pattern that's cheap everywhere. "Just add to the end" isn't simplicity for its own sake — it's the fastest thing a disk can do.</p>
+  </section>
+
+  <section id="durability">
+    <div class="sectit">14 — The hardware ceiling</div>
+    <h2><span class="hash">#</span> Durability: write() is not safe yet</h2>
+    <p>A returned <code class="inl">write()</code> does not mean the data survived a crash. It usually lands in the OS <strong>page cache</strong> and is flushed to the device later (write-back caching). A power loss in that window loses it.</p>
+    <table>
+      <tr><th>Call</th><th>Guarantee</th><th>Cost</th></tr>
+      <tr><td>write()</td><td>In OS page cache, not durable</td><td>Cheap, fast</td></tr>
+      <tr><td>fsync()</td><td>Data + metadata on the device</td><td>Expensive — waits for hardware</td></tr>
+      <tr><td>fdatasync()</td><td>Data on device, skips some metadata</td><td>Cheaper than fsync</td></tr>
+      <tr><td>O_DIRECT</td><td>Bypasses page cache entirely</td><td>Specialist; you manage caching</td></tr>
+    </table>
+    <div class="note am">
+      <div class="h">The lever that actually matters for a log</div>
+      <p>The expensive operation is the <code class="inl">fsync</code>, not the write. So the throughput question for a log isn't "how many writes in flight" — it's <em>"how few fsyncs for how many records."</em> Batch many appends per fsync per partition. This beats maximizing raw concurrent write calls, and it's how real brokers hit their numbers. Real durability ultimately comes from <strong>replication</strong> (a copy on another machine), not from fsync alone.</p>
+    </div>
+  </section>
+
+  <section id="little">
+    <div class="sectit">15 — The hardware ceiling</div>
+    <h2><span class="hash">#</span> Little's law — how many in flight?</h2>
+    <p>A precise tool for sizing concurrency, borrowed from queueing theory:</p>
+    <div class="slogan"><p>in-flight = throughput × latency &nbsp;&nbsp;<em>( L = λ × W )</em></p></div>
+    <p>To sustain 10,000 writes/sec at 2ms latency each, you need <code class="inl">10000 × 0.002 = 20</code> operations in flight at all times. That number tells you how big your pool or queue depth needs to be — no more, no less. Set the pool to 20-ish, not 1000. It also explains the ceiling: if the device can only hold so many in flight, your max throughput is bounded by that divided by latency. Stop guessing pool sizes; compute them.</p>
+  </section>
+
+  <!-- ============ SCALING OUT ============ -->
+  <section id="threadsproc">
+    <div class="sectit">16 — Scaling out</div>
+    <h2><span class="hash">#</span> Threads vs processes</h2>
+    <p>When one core or one fault domain becomes the limit, you replicate the unit of execution. The two ways differ in what they share.</p>
+    <table>
+      <tr><th></th><th>Threads</th><th>Processes</th></tr>
+      <tr><td>Memory</td><td>Shared address space</td><td>Isolated — separate memory</td></tr>
+      <tr><td>Communication</td><td>Shared variables (need locks)</td><td>Message passing / IPC</td></tr>
+      <tr><td>A crash</td><td>Takes the whole process</td><td>Contained to one process</td></tr>
+      <tr><td>Cost</td><td>Cheap to spawn, light</td><td>Heavier — own heap, slower start</td></tr>
+      <tr><td>Correctness</td><td>You own race conditions</td><td>No shared-memory races</td></tr>
+    </table>
+    <p>Shared memory makes threads fast and dangerous; isolation makes processes safe and a little heavier. This tradeoff — not "which is real parallelism" — is the actual decision.</p>
+  </section>
+
+  <section id="gil">
+    <div class="sectit">17 — Scaling out</div>
+    <h2><span class="hash">#</span> The GIL, and why languages differ</h2>
+    <p>"Threading isn't real parallelism" is true for <em>some</em> runtimes and false for most. Threads <strong>are</strong> real parallelism in C, C++, Java, Go, Rust — two threads genuinely run on two cores. What blocks it in JS and Python is a runtime constraint, not a property of threads.</p>
+    <ul class="clean">
+      <li><strong>JavaScript</strong> — one execution thread per isolate. Workers don't share a heap by default. CPU parallelism needs separate isolates (workers/processes).</li>
+      <li><strong>Python</strong> — the Global Interpreter Lock: only one thread runs bytecode at a time. Same outcome, different mechanism. (Being relaxed in newer "free-threaded" builds.)</li>
+      <li><strong>JVM / Go / Rust</strong> — no such lock. Threads run truly in parallel within one process, sharing memory.</li>
+    </ul>
+    <div class="slogan"><p>The precise statement: <em>in GIL-style runtimes, threads don't give CPU parallelism, so you reach for processes.</em> Elsewhere, threads do. It's about the runtime, not about threads.</p></div>
+  </section>
+
+  <section id="toolkit">
+    <div class="sectit">18 — Scaling out</div>
+    <h2><span class="hash">#</span> Node's concurrency toolkit</h2>
+    <p>Three ways to get more than one event loop, each for a different job:</p>
+    <table>
+      <tr><th>Tool</th><th>Gives you</th><th>Use when</th></tr>
+      <tr><td>cluster</td><td>N processes sharing a listening port</td><td>Scale a server across cores; load-balanced connections</td></tr>
+      <tr><td>worker_threads</td><td>Extra threads, own isolate, can share memory via SharedArrayBuffer</td><td>CPU-bound work (compression, hashing) without leaving the process</td></tr>
+      <tr><td>child_process</td><td>Arbitrary separate processes</td><td>Run other programs, full isolation, different runtimes</td></tr>
+    </table>
+    <p>For an I/O-bound broker, <code class="inl">cluster</code> (or just separate process instances) is the idiomatic scale-out: one loop per core, each owning a subset of partitions. Reach for <code class="inl">worker_threads</code> only when per-record CPU work — not I/O — is the bottleneck.</p>
+  </section>
+
+  <section id="shared">
+    <div class="sectit">19 — Scaling out</div>
+    <h2><span class="hash">#</span> Shared memory in JS: SharedArrayBuffer</h2>
+    <p>Worker threads normally communicate by copying messages. For hot paths that's too slow, so JS offers <strong>SharedArrayBuffer</strong> — a block of memory visible to multiple workers at once — paired with <strong>Atomics</strong> for safe concurrent access (atomic reads/writes, compare-and-swap, and a lightweight wait/notify).</p>
+    <p>This is the one place JS hands you real shared-memory concurrency, with the real shared-memory hazards: you now need atomics and careful ordering, exactly like a threaded language. Useful for a shared counter or ring buffer across workers; overkill for most app code. Knowing it exists matters when message-copying becomes your ceiling.</p>
+  </section>
+
+  <section id="green">
+    <div class="sectit">20 — Scaling out</div>
+    <h2><span class="hash">#</span> Green threads &amp; goroutines</h2>
+    <p>Go's model is worth understanding as the contrast. <strong>Goroutines</strong> are cheap user-space "threads" (a few KB each) multiplexed by the runtime onto a small pool of real OS threads — an <strong>M:N scheduler</strong> (M goroutines on N OS threads, N defaulting to your core count).</p>
+    <p>The payoff: you write simple <em>blocking</em> code — a goroutine just does a blocking write — and the runtime parks it and runs another while it waits. You get the ergonomics of "one thread per task" with the efficiency of an event loop, plus real CPU parallelism because the underlying OS threads run on multiple cores with shared memory. It's why Go expresses "100 independent partition writers" directly, with no thread-pool tuning and no <code class="inl">await</code>-placement subtlety — the cost being that you now own shared-memory correctness (mutexes, atomics, races).</p>
+  </section>
+
+  <section id="scenarios">
+    <div class="sectit">21 — Scaling out</div>
+    <h2><span class="hash">#</span> The three scenarios, evaluated</h2>
+    <p>100 partitions, 100 disks. Same workload, three models. They are not equally good — and the right answer depends entirely on the bottleneck.</p>
+    <table>
+      <tr><th>Model</th><th>Strength</th><th>Weakness</th></tr>
+      <tr><td>Node · 100 pool threads</td><td>Simplest; offsets are in-memory counters; zero coordination</td><td>One event loop = CPU ceiling + single crash domain for all 100</td></tr>
+      <tr><td>Node · N processes</td><td>Real CPU parallelism + fault isolation</td><td>Cross-process coordination (ownership, routing); memory; use ~1 per core, not 100</td></tr>
+      <tr><td>Go · 100 goroutines</td><td>CPU parallelism in one address space, no IPC tax, blocking-style code</td><td>You own race safety; still one crash domain per process</td></tr>
+    </table>
+    <ul class="clean">
+      <li><strong>Pure I/O-bound, 100 real disks</strong> → all three saturate the disks. The Node single-loop version is genuinely enough; more processes buy robustness, not throughput.</li>
+      <li><strong>Per-record CPU work appears</strong> (compression, checksums) → the single loop starves the disks. Now you need multiple cores: Go in-process, or Node across processes.</li>
+      <li><strong>Fault isolation</strong> (one bad partition mustn't kill 99) → only multiple <em>processes</em> help, in either language.</li>
+    </ul>
+    <div class="slogan"><p>Threads/goroutines/pool-threads give <em>concurrency of execution</em>; independent disks give <em>parallelism of writing</em>; separate processes give <em>fault isolation</em> and, in Node, <em>CPU parallelism</em>. Pick by what you're short on — not by what sounds most parallel.</p></div>
+  </section>
+
+  <!-- ============ SYNTHESIS ============ -->
+  <section id="partitions">
+    <div class="sectit">22 — Synthesis</div>
+    <h2><span class="hash">#</span> Partitions: the unit of everything</h2>
+    <p>A partition isn't a performance trick bolted on — it's the structural unit that makes all three benefits possible at once.</p>
+    <ul class="clean">
+      <li><strong>Concurrency</strong> — N partitions are N independent ordered streams. They don't contend for one tail, so their writes overlap freely.</li>
+      <li><strong>Ordering</strong> — within a partition you serialize (one in-flight write at a time), so per-key order is preserved. Across partitions there is no global order, by design.</li>
+      <li><strong>Distribution</strong> — the partition is the unit you hand to a process, a disk, or a machine. This is the one that scales without limit.</li>
+    </ul>
+    <p>Routing stays trivial regardless of scale: <code class="inl">partition = hash(key) % N</code>. A given drone's events always land in the same partition — preserving its order — no matter which process or machine owns that partition.</p>
+    <p>This is exactly how real Kafka scales, and why a single-threaded Node broker is closer to Kafka's model than it seems. Kafka doesn't write one partition with many threads either; it spreads partitions across <strong>multiple brokers, on multiple machines, on multiple disks</strong>. The parallelism lives at the partition/disk/machine level — the same lever you reach for in Node.</p>
+  </section>
+
+  <section id="amdahl">
+    <div class="sectit">23 — Synthesis</div>
+    <h2><span class="hash">#</span> Amdahl's law: where scaling stops</h2>
+    <p>Adding workers has a hard limit set by the part that <em>can't</em> parallelize. If 5% of the work is serial, the maximum speedup is 20×, no matter how many cores you throw at it — the serial 5% dominates.</p>
+    <p>For a broker, the serial fractions are the things every write must pass through: a single global offset counter, a shared metadata map, one coordinator. The design lesson is to <strong>shrink the serial part</strong> — per-partition offset counters instead of one global counter, shared-nothing partitions instead of shared state — so that adding partitions and machines actually buys near-linear scaling instead of hitting a wall.</p>
+    <div class="slogan"><p>You don't scale by adding workers. You scale by <em>removing the thing they all have to wait on.</em></p></div>
+  </section>
+
+  <section id="decision">
+    <div class="sectit">24 — Synthesis</div>
+    <h2><span class="hash">#</span> The decision framework</h2>
+    <p>The whole manual collapses to one question asked in order: <strong>what is the bottleneck?</strong></p>
+    <table>
+      <tr><th>If you're short on…</th><th>The symptom</th><th>The lever</th></tr>
+      <tr><td>I/O concurrency</td><td>One op waits for the last; throughput low, CPU idle</td><td>Dispatch without awaiting between ops; raise pool / queue depth to Little's-law size</td></tr>
+      <tr><td>Disk parallelism</td><td>Pool full, all writes queue on one device</td><td>More independent disks / volumes — hardware, not software</td></tr>
+      <tr><td>CPU</td><td>One core pinned, disks idle, loop lags</td><td>worker_threads (Node) or true threads (Go); spread CPU work across cores</td></tr>
+      <tr><td>Fault isolation</td><td>One bug takes everything down</td><td>Multiple processes, each owning a partition subset</td></tr>
+      <tr><td>Durability</td><td>Crash loses recent writes</td><td>Batch fsync per partition; replicate to another machine</td></tr>
+      <tr><td>Linear scaling</td><td>Adding workers stops helping</td><td>Remove the shared serial point (Amdahl)</td></tr>
+    </table>
+    <div class="slogan"><p>The hardware does the parallel work in every design. Threads, processes, and runtimes are just different-cost ways to <em>feed</em> it. Choose the cheapest one that clears your actual bottleneck.</p></div>
+  </section>
+
+  <footer>
+    <div><b>Concurrency &amp; the Event Loop</b> · field manual · v1</div>
+    <div>concurrency of waiting · parallelism of working · the hardware decides</div>
+    <div style="margin-top:10px;color:var(--dim)">// async overlaps the waiting; hardware overlaps the work; partitions are how you reach it</div>
+  </footer>
+</main>
+
+<script>
+(function(){
+  document.querySelectorAll('.copy').forEach(function(b){
+    b.addEventListener('click',function(){
+      var t=b.closest('.code').querySelector('pre').innerText;
+      navigator.clipboard.writeText(t).then(function(){b.textContent='COPIED';b.classList.add('done');
+        setTimeout(function(){b.textContent='COPY';b.classList.remove('done');},1300);}).catch(function(){b.textContent='—';});
+    });
+  });
+  var sb=document.getElementById('sidebar'),mt=document.getElementById('mtoggle');
+  mt&&mt.addEventListener('click',function(){sb.classList.toggle('open');});
+  document.querySelectorAll('#toc a').forEach(function(a){a.addEventListener('click',function(){sb.classList.remove('open');});});
+  var links=[].slice.call(document.querySelectorAll('#toc a')),map={};
+  links.forEach(function(a){var id=a.getAttribute('href').slice(1),el=document.getElementById(id);if(el)map[id]=a;});
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){
+    links.forEach(function(l){l.classList.remove('active');});var a=map[e.target.id];if(a){a.classList.add('active');
+      a.scrollIntoView({block:'nearest'});}}});},{rootMargin:'-12% 0px -80% 0px',threshold:0});
+  Object.keys(map).forEach(function(id){io.observe(document.getElementById(id));});
+})();
+</script>
+</body>
+</html>
